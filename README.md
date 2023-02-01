@@ -89,7 +89,12 @@
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-_Work in Progress (the documentation not the code)_
+To run the code, use the following command
+```sh
+python3 main.py [options] <filename>
+```
+
+A full list of the options are given in the Wiki!
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
