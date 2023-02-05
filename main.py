@@ -1,9 +1,11 @@
-import pprint
-import sys
-import struct
 import argparse
 import os
-__version__ = "1.0.0"
+import pprint
+import struct
+import sys
+from typing import Any
+
+__version__ = "1.0.1"
 __author__ = 'Aarav Malani'
 __license__ = 'MIT'
 
@@ -13,6 +15,8 @@ if os.name == 'nt':
 parser = argparse.ArgumentParser(
     prog='ConstantPoolEditor',
     description='Edits the constant pool of a Java file')
+
+
 parser.add_argument(
     "filename", help="The name of the .class file to parse", nargs='?')
 parser.add_argument(
@@ -23,6 +27,7 @@ parser.add_argument(
     "-r", "--resolve", help="Resolve the indexes in the constant pool", action='store_true')
 parser.add_argument("-H", "--hide-tag",
                     help="Hides the tag and length of the constant pool elements", action='store_true')
+
 args = parser.parse_args()
 if args.version:
     print("ConstantPoolEditor "+__version__)
@@ -35,21 +40,44 @@ if not args.filename:
     sys.exit(1)
 
 
-def nextBytes(x, d, func=int.from_bytes):
-    return func(d[:x]), d[x:]
+def nextBytes(no_of_bytes: int, data: bytes, func: function = int.from_bytes) -> tuple[Any,bytes]:
+    """
+    Splits the bytes at index `no_of_bytes` and returns a tupl
+
+    For example
+    ```
+    nextBytes(2, b'data', func=bytes) ## (b'da',b'ta')
+    ```
+    
+    Parameters:
+    `no_of_bytes`: Index at which to split 
+    `data`: The data to split
+    `func`: The function to call on splitting (default is `int.from_bytes`)
+
+    Returns:
+    tuple: A two elemented tuple containing the slices of the bytes
+
+    """
+    return func(data[:no_of_bytes]), data[no_of_bytes:]
 
 
 with open(args.filename, "rb") as f:
-    b = f.read()
-magic, b = nextBytes(4, b, bytes)
-if magic != b'\xca\xfe\xba\xbe':
-    print("ERROR: Invalid magic")
-    sys.exit(0)
-minor, b = nextBytes(2, b)
-major, b = nextBytes(2, b)
-a = {k: '1.'+str(i) for k, i in zip([45]+list(range(45, 64)), [*range(0, 20)])}
-cpc, b = nextBytes(2, b)
-cp = []
+    classData : bytes = f.read()
+
+magic, classData = nextBytes(4, classData, bytes)
+
+if magic != b'\xca\xfe\xba\xbe': # All .class files start with cafebabe
+    print("ERROR: Invalid magic", file=sys.stderr)
+    sys.exit(1)
+
+minor, classData = nextBytes(2, classData)
+major, classData = nextBytes(2, classData)
+major_to_string = {k: '1.'+str(i) for k, i in zip([45]+list(range(45, 64)), [*range(0, 20)])} # This is very unintuitive code to generate the mappings for int to string major versions
+if not major_to_string.get(major):
+    print("ERROR: Invalid major version! Perhaps try updating this software (Version "+__version__+")", file=sys.stderr)
+    sys.exit(1)
+constant_pool_count, classData = nextBytes(2, classData)
+
 
 
 class CONSTANT:
@@ -76,6 +104,7 @@ class CONSTANT:
 
         return returned
 
+cp : list[CONSTANT]= []
 
 def pack(dct):
     returned = b''
@@ -217,8 +246,8 @@ class CONSTANT_InvokeDynamic(CONSTANT):
         return pack([{self.tag: 1}, {self.bootstrap_method_attr_index: 2}, {self.name_and_type_index: 2}])
 
 
-for i in range(cpc - 1):
-    c, b = nextBytes(1, b)
+for i in range(constant_pool_count - 1):
+    tag, classData = nextBytes(1, classData)
 
     lengthTable = {
         7: 2,
@@ -237,14 +266,14 @@ for i in range(cpc - 1):
         18: 4
     }
     try:
-        data, b = nextBytes(lengthTable[c], b, func=bytes)
+        data, classData = nextBytes(lengthTable[tag], classData, func=bytes)
     except:
         print("Error loading file! Dumping constant pool!")
         pprint.pprint(cp)
         sys.exit(1)
-    if c == 1:
-        data2, b = nextBytes(int.from_bytes(data[:2]), b, bytes)
-        data += data2
+    if tag == 1: ## Special Utf-8 Case
+        utfData, classData = nextBytes(int.from_bytes(data[:2]), classData, bytes)
+        data += utfData
     classTable = {
         1: CONSTANT_Utf8,
         7: CONSTANT_Class,
@@ -261,37 +290,37 @@ for i in range(cpc - 1):
         16: CONSTANT_MethodType,
         18: CONSTANT_InvokeDynamic
     }
-    cp += [classTable.get(c, bytes)(c.to_bytes(1)+data)]
+    cp += [classTable.get(tag, bytes)(tag.to_bytes(1)+data)]
 
-print("Class File Version: "+a[major]+('.'+str(minor) if minor else ''))
-print('Constant Pool Length: '+str(cpc))
+print("Class File Version: "+major_to_string[major]+('.'+str(minor) if minor else ''))
+print('Constant Pool Length: '+str(constant_pool_count))
 for c, i in enumerate(cp):
-    print(hex(c+1)[2:].zfill(4) + ': '+str(i))
+    print(str(c+1).zfill(8) + ': '+str(i))
 
 if args.edit:
     while True:
-        a = int(input("Index (Type -1 to save)? ")) - 1
-        if a == -2:
+        try:
+            index = int(input("Index (Enter nothing to save)? "))
+        except:
             break
-        c = list(enumerate(filter(lambda x: x[0] not in ['tag', 'length'], zip(
-            cp[a].__dict__.keys(), cp[a].__dict__.values()))))
-        for i in c:
-            print(str(i[0] + 1) + '. '+str(i[1][0]) + ': '+str(i[1][1]))
-        x = int(input("Choose value to edit? "))
-        d = input('Enter value? ')
+        values = list(filter(lambda x: x[0] not in ['tag', 'length'], zip(
+            cp[index].__dict__.keys(), cp[index].__dict__.values())))
+        for c, (k, v) in enumerate(values):
+            print(str(c + 1) + '. '+str(k) + ': '+str(v))
+        valIndex = int(input("Choose value to edit? "))
+        value = input('Enter value? ')
 
         os.system('cls' if os.name == 'nt' else 'clear')
         try:
-            cp[a].__dict__[c[x-1][1][0]] = type(c[x-1][1][1])(d)
-        except TypeError:
-            cp[a].__dict__[c[x-1][1][0]
-                           ] = type(c[x-1][1][1])(d, encoding='utf8')
-        if not (cp[a].tag - 1):
-            cp[a].length = len(cp[a].bytes)
+            cp[index].__dict__[c[valIndex-1][0]] = type(c[valIndex-1][1])(value)
+        except TypeError: ## Pesky byte handling
+            cp[index].__dict__[c[valIndex-1][0]] = type(c[valIndex-1][1])(value, encoding='utf8')
+        if cp[index].tag == 1:
+            cp[index].length = len(cp[index].bytes)
         for c, i in enumerate(cp):
-            print(hex(c+1)[2:].zfill(4) + ': '+str(i))
+            print(str(c+1).zfill(8) + ': '+str(i))
     with open(input("Save to [default is "+args.filename+"]? ") or args.filename, 'wb') as f:
         data = b'\xca\xfe\xba\xbe'+int.to_bytes(minor, 2)+int.to_bytes(
-            major, 2)+int.to_bytes(cpc, 2) + b''.join([i.pack() for i in cp]) + b
+            major, 2)+int.to_bytes(constant_pool_count, 2) + b''.join([i.pack() for i in cp]) + classData
         f.write(data)
         print("Saved and exiting!")
