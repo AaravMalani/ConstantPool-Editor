@@ -39,9 +39,6 @@ if not args.filename:
     print("ConstantPoolEditor: error: the following arguments are required: filename")
     sys.exit(1)
 
-
-byte_count = 0
-
 def nextBytes(no_of_bytes: int, data: bytes, func: callable = int.from_bytes) -> tuple[Any,bytes]:
     """
     Splits the bytes at index `no_of_bytes` and returns a tupl
