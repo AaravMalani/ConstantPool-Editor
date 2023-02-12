@@ -66,13 +66,14 @@ if magic != b'\xca\xfe\xba\xbe': # All .class files start with cafebabe
     print("ERROR: Invalid magic", file=sys.stderr)
     sys.exit(1)
 
-minor, classData = nextBytes(2, classData, bytes)
-major, classData = nextBytes(2, classData, bytes)
-major_int = int.from_bytes(major, byteorder='big')
-if major_int not in range(45, 64):
+minor, classData = nextBytes(2, classData)
+major, classData = nextBytes(2, classData)
+major_to_string = {k: '1.'+str(i) for k, i in zip([45]+list(range(45, 64)), [*range(0, 20)])} # This is very unintuitive code to generate the mappings for int to string major versions
+if not major_to_string.get(major):
     print("ERROR: Invalid major version! Perhaps try updating this software (Version "+__version__+")", file=sys.stderr)
     sys.exit(1)
-constant_pool_count, classData = nextBytes(2, classData, bytes)
+constant_pool_count, classData = nextBytes(2, classData)
+
 
 class CONSTANT:
     def __repr__(self):
@@ -240,8 +241,8 @@ class CONSTANT_InvokeDynamic(CONSTANT):
         return pack([{self.tag: 1}, {self.bootstrap_method_attr_index: 2}, {self.name_and_type_index: 2}])
 
 
-for i in range(len(constant_pool_count) - 1):
-    tag, classData = nextBytes(1, classData, bytes)
+for i in range(constant_pool_count - 1):
+    tag, classData = nextBytes(1, classData)
 
     lengthTable = {
         7: 2,
