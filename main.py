@@ -5,12 +5,9 @@ import struct
 import sys
 from typing import Any
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 __author__ = 'Aarav Malani'
 __license__ = 'MIT'
-
-if os.name == 'nt':
-    os.system("color")
 
 parser = argparse.ArgumentParser(
     prog='ConstantPoolEditor',
@@ -27,6 +24,8 @@ parser.add_argument(
     "-r", "--resolve", help="Resolve the indexes in the constant pool", action='store_true')
 parser.add_argument("-H", "--hide-tag",
                     help="Hides the tag and length of the constant pool elements", action='store_true')
+parser.add_argument("-x", "--hex",
+                    help="Displays and takes input of constant pool indices in hexadecimal", action='store_true')
 
 args = parser.parse_args()
 if args.version:
@@ -84,12 +83,14 @@ class CONSTANT:
 
             if args.resolve and i.endswith('_index'):
                 try:
-                    val = str(cp[self.__dict__[i]-1])
+                    val = cp[self.__dict__[i]-1]
                     if type(val) is CONSTANT_Utf8:
                         val = val.bytes.decode('latin1')
-                    returned += i+'='+val + ' '
+                    else:
+                        val = str(val)
+                    returned += i[:-6]+'='+val + ' '
                 except:
-                    returned += i+'='+str(self.__dict__[i])
+                    returned += i[:-6]+'='+str(self.__dict__[i])
             elif type(self.__dict__[i]) is bytes:
                 returned += i + '='+self.__dict__[i].decode('latin1') + ' '
             else:
@@ -290,30 +291,30 @@ for i in range(constant_pool_count - 1):
 print("Class File Version: "+major_to_string[major]+('.'+str(minor) if minor else ''))
 print('Constant Pool Length: '+str(constant_pool_count))
 for c, i in enumerate(cp):
-    print(str(c+1).zfill(8) + ': '+str(i))
+    print((hex if args.hex else str)(c+1)[2 if args.hex else 0:].zfill(8) + ': '+str(i))
 
 if args.edit:
     while True:
         try:
-            index = int(input("Index (Enter nothing to save)? "))
+            index = int(input("Index (Enter nothing to save)? "), 16 if args.hex else 10) - 1
         except:
             break
         values = list(filter(lambda x: x[0] not in ['tag', 'length'], zip(
             cp[index].__dict__.keys(), cp[index].__dict__.values())))
         for c, (k, v) in enumerate(values):
-            print(str(c + 1) + '. '+str(k) + ': '+str(v))
-        valIndex = int(input("Choose value to edit? "))
+            print((hex if args.hex else str)(c + 1)[2 if args.hex else 0:] + '. '+str(k) + ': '+str(v))
+        valIndex = int(input("Choose value to edit? "), 16 if args.hex else 10)
         value = input('Enter value? ')
 
         os.system('cls' if os.name == 'nt' else 'clear')
         try:
-            cp[index].__dict__[c[valIndex-1][0]] = type(c[valIndex-1][1])(value)
+            cp[index].__dict__[values[valIndex-1][0]] = type(values[valIndex-1][1])(value)
         except TypeError: ## Pesky byte handling
-            cp[index].__dict__[c[valIndex-1][0]] = type(c[valIndex-1][1])(value, encoding='utf8')
+            cp[index].__dict__[values[valIndex-1][0]] = type(values[valIndex-1][1])(value, encoding='utf8')
         if cp[index].tag == 1:
             cp[index].length = len(cp[index].bytes)
         for c, i in enumerate(cp):
-            print(str(c+1).zfill(8) + ': '+str(i))
+            print((hex if args.hex else str)(c+1)[2 if args.hex else 0:].zfill(8) + ': '+str(i))
     with open(input("Save to [default is "+args.filename+"]? ") or args.filename, 'wb') as f:
         data = b'\xca\xfe\xba\xbe'+int.to_bytes(minor, 2)+int.to_bytes(
             major, 2)+int.to_bytes(constant_pool_count, 2) + b''.join([i.pack() for i in cp]) + classData
