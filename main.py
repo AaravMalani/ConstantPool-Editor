@@ -39,11 +39,9 @@ if not args.filename:
     print("ConstantPoolEditor: error: the following arguments are required: filename")
     sys.exit(1)
 
-
-def nextBytes(no_of_bytes: int, data: bytes, func: function = int.from_bytes) -> tuple[Any,bytes]:
+def nextBytes(no_of_bytes: int, data: bytes, func: callable = int.from_bytes) -> tuple[Any,bytes]:
     """
     Splits the bytes at index `no_of_bytes` and returns a tupl
-
     For example
     ```
     nextBytes(2, b'data', func=bytes) ## (b'da',b'ta')
@@ -53,10 +51,8 @@ def nextBytes(no_of_bytes: int, data: bytes, func: function = int.from_bytes) ->
     `no_of_bytes`: Index at which to split 
     `data`: The data to split
     `func`: The function to call on splitting (default is `int.from_bytes`)
-
     Returns:
     tuple: A two elemented tuple containing the slices of the bytes
-
     """
     return func(data[:no_of_bytes]), data[no_of_bytes:]
 
@@ -77,7 +73,6 @@ if not major_to_string.get(major):
     print("ERROR: Invalid major version! Perhaps try updating this software (Version "+__version__+")", file=sys.stderr)
     sys.exit(1)
 constant_pool_count, classData = nextBytes(2, classData)
-
 
 
 class CONSTANT:
