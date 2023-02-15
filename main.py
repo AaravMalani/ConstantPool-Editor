@@ -129,7 +129,7 @@ class CONSTANT_Ref(CONSTANT):
     def __init__(self, data):
         self.tag = data[0]
         self.class_index = int.from_bytes(data[1:3])
-        self.name_and_type_index = int.from_bytes(data[3:])
+        self.name_and_type_index = int.from_bytes(data[3:5])
 
     def pack(self):
         return pack([{self.tag: 1}, {self.class_index: 2}, {self.name_and_type_index: 2}])
@@ -150,7 +150,7 @@ class CONSTANT_InterfaceMethodref(CONSTANT_Ref):
 class CONSTANT_String(CONSTANT):
     def __init__(self, data):
         self.tag = data[0]
-        self.string_index = int.from_bytes(data[1:])
+        self.string_index = int.from_bytes(data[1:3])
 
     def pack(self):
         return pack([{self.tag: 1}, {self.string_index: 2}])
@@ -197,7 +197,7 @@ class CONSTANT_Double(CONSTANT):
 class CONSTANT_Class(CONSTANT):
     def __init__(self, data):
         self.tag = data[0]
-        self.name_index = int.from_bytes(data[1:])
+        self.name_index = int.from_bytes(data[1:3])
 
     def pack(self):
         return pack([{self.tag: 1}, {self.name_index: 2}])
@@ -207,7 +207,7 @@ class CONSTANT_NameAndType(CONSTANT):
     def __init__(self, data):
         self.tag = data[0]
         self.name_index = int.from_bytes(data[1:3])
-        self.descriptor_index = int.from_bytes(data[3:])
+        self.descriptor_index = int.from_bytes(data[3:5])
 
     def pack(self):
         return pack([{self.tag: 1}, {self.name_index: 2}, {self.descriptor_index: 2}])
@@ -217,7 +217,7 @@ class CONSTANT_MethodHandle(CONSTANT):
     def __init__(self, data):
         self.tag = data[0]
         self.reference_kind = int.from_bytes(data[1:2])
-        self.reference_index = int.from_bytes(data[2:])
+        self.reference_index = int.from_bytes(data[2:4])
 
     def pack(self):
         return pack([{self.tag: 1}, {self.reference_kind: 1}, {self.reference_index: 2}])
@@ -241,6 +241,20 @@ class CONSTANT_InvokeDynamic(CONSTANT):
     def pack(self):
         return pack([{self.tag: 1}, {self.bootstrap_method_attr_index: 2}, {self.name_and_type_index: 2}])
 
+class CONSTANT_Module(CONSTANT):
+    def __init__(self, data):
+        self.tag = data[0]
+        self.name_index = int.from_bytes(data[1:3])
+    def pack(self):
+        return pack([{self.tag:1},{self.name_index:2}])
+
+class CONSTANT_Package(CONSTANT):
+    def __init__(self, data):
+        self.tag = data[0]
+        self.name_index = int.from_bytes(data[1:3])
+    def pack(self):
+        return pack([{self.tag:1},{self.name_index:2}])
+
 
 for i in range(constant_pool_count - 1):
     tag, classData = nextBytes(1, classData)
@@ -259,7 +273,9 @@ for i in range(constant_pool_count - 1):
         1: 2,
         15: 3,
         16: 2,
-        18: 4
+        18: 4,
+        19: 2,
+        20: 2
     }
     try:
         data, classData = nextBytes(lengthTable[tag], classData, func=bytes)
@@ -284,7 +300,9 @@ for i in range(constant_pool_count - 1):
         12: CONSTANT_NameAndType,
         15: CONSTANT_MethodHandle,
         16: CONSTANT_MethodType,
-        18: CONSTANT_InvokeDynamic
+        18: CONSTANT_InvokeDynamic,
+        19: CONSTANT_Module,
+        20: CONSTANT_Package
     }
     cp += [classTable.get(tag, bytes)(tag.to_bytes(1)+data)]
 
